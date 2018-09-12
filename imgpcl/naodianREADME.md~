@@ -1,0 +1,20 @@
+#final
+############################
+#脑电控制机械臂抓取
+    #机械臂
+        cd 2017_ws
+        source devel/setup.bash
+        sudo dmesg -c
+        sudo chmod 666 /dev/ttyUSB0
+        roslaunch arm_2017 ed_arm_final.launch
+    #图像
+        cd 2017_ws
+        source devel/setup.bash
+        roslaunch imgcpl naodian.launch
+        单独运行需要：
+        rostopic pub /nav2image std_msgs/String -- reached_table
+        rostopic pub /gpsr_object std_msgs/String -- potato-chips
+
+    # 运行语音部分的步骤
+        # 运行的是 gpsr_detect_object.py  以及  talkback_gpsr2.py
+        # 词库 dect_corpus 文件夹

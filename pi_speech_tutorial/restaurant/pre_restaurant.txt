@@ -1,0 +1,8 @@
+begin
+jack
+green-tea
+iced-tea
+grape-fruit-juice
+strawberry-juice
+potato-chips
+cookie

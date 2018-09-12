@@ -1,0 +1,4 @@
+<launch>
+ <node name="find_person2017_gpsr" pkg="imgpcl" type="find_person2017_gpsr" output="screen" >
+ </node>
+</launch>

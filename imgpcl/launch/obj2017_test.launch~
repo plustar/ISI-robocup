@@ -1,0 +1,6 @@
+<launch>
+<include file="/opt/ros/indigo/share/openni2_launch/launch/primesense_test.launch" />
+<include file="/home/isi/2017_ws/src/arm_2017/launch/hsn_test.launch" />
+ <node name="obj2017_test" pkg="imgpcl" type="obj2017_test" output="screen" >
+ </node>
+</launch>

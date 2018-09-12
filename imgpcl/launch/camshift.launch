@@ -1,0 +1,5 @@
+<launch>  
+<include file="/opt/ros/indigo/share/openni2_launch/launch/openni2.launch" />  
+ <node name="camshift" pkg="imgpcl" type="camshift" output="screen" >  
+ </node>  
+</launch> 

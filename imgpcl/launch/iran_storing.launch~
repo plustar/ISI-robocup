@@ -1,0 +1,6 @@
+<launch>
+<include file="/opt/ros/indigo/share/openni2_launch/launch/primesense_test.launch" />
+<include file="/opt/ros/indigo/share/turtlebot_bringup/launch/minimal.launch" />
+<node name="iran_storing" pkg="imgpcl" type="iran_storing" output="screen" />
+  </node>
+</launch>

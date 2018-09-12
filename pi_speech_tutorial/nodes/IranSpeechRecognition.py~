@@ -1,0 +1,140 @@
+#!/usr/bin/env python
+
+"""
+    talkback.py - Say back what is heard by the pocketsphinx recognizer.
+tab form!!!
+"""
+
+import roslib; roslib.load_manifest('pi_speech_tutorial')
+import rospy
+import datetime
+import re
+import time
+from std_msgs.msg import String
+from std_msgs.msg import Int16
+
+from sound_play.libsoundplay import SoundClient
+
+speak = 0
+
+class TalkBack:
+     
+	def __init__(self):
+		rospy.on_shutdown(self.cleanup)
+		self.voice = rospy.get_param("~voice", "voice_don_diphone")
+		self.wavepath = rospy.get_param("~wavepath", "")
+		#self.pass_action = rospy.Publisher('action', Int16, queue_size = 10)
+		self.soundhandle = SoundClient()
+		rospy.sleep(1)
+		self.soundhandle.stopAll()
+ 		##rospy.Subscriber('speaker_start', String, self.speakerstart)
+		rospy.Subscriber('recognizer_output', String, self.recognition)
+		self.soundhandle.say('i want to play riddle game', self.voice)
+		rospy.sleep(3)
+		self.soundhandle.say('who want to play riddle game', self.voice)
+		rospy.sleep(3)
+	
+	def recognition(self, msg) :
+		global speak
+		msg.data = msg.data.lower()
+		print msg.data
+	#	if msg.data.find('kamerider') > -1:
+	#		self.soundhandle.playWave(self.wavepath + "/R2D2a.wav")
+	#		rospy.sleep(1)
+	##	if speak == 1:
+	##		print "hihihi"
+		if msg.data.find('who-is') > -1 or msg.data.find('inventor') > -1 or msg.data.find('electricity') > -1 :
+					self.soundhandle.say('edison', self.voice)
+					rospy.sleep(4)
+			##		speak = 0
+		elif msg.data.find('what-is') > -1 or msg.data.find('what is') > -1 : 
+			if msg.data.find('capital') > -1 or msg.data.find('capital of iran') > -1 :
+				self.soundhandle.say('tehran', self.voice)
+				rospy.sleep(4)
+			##	speak = 0
+			elif msg.data.find('league') > -1 or msg.data.find('title') > -1:
+				self.soundhandle.say('at home league', self.voice)
+				rospy.sleep(4)
+			##	speak = 0
+			elif msg.data.find('famous food') > -1 :
+				self.soundhandle.say('kebab', self.voice)
+				rospy.sleep(4)
+			##	speak = 0
+			elif msg.data.find('healthiest') > -1 or msg.data.find('fruit') > -1 :
+				self.soundhandle.say('apple', self.voice)
+				rospy.sleep(4)
+			##	speak = 0
+			elif msg.data.find('heaviest-animal') > -1 or msg.data.find('earth') > -1:
+				self.soundhandle.say('elephant', self.voice)
+				rospy.sleep(4)
+			##	speak = 0
+			elif msg.data.find('pizza') > -1 or msg.data.find('country-of') > -1:
+				self.soundhandle.say('italy', self.voice)
+				rospy.sleep(4)
+			##	speak = 0
+		elif msg.data.find('which') > -1:
+			if msg.data.find('animal') > -1 and msg.data.find('afraid') > -1:
+				self.soundhandle.say('lion', self.voice)
+				rospy.sleep(4)
+			##	speak = 0
+	
+		elif msg.data.find('how-many') > -1 :
+			if msg.data.find('player') > -1 or msg.data.find('football') > -1 :
+				self.soundhandle.say('eleven', self.voice)
+				rospy.sleep(4)
+ 			##	speak = 0
+			elif msg.data.find('chairs') > -1 or msg.data.find('many chairs') > -1 or msg.data.find('many chairs are in the dining room') > -1 :
+				self.soundhandle.say('there are two chairs in the dining room', self.voice)
+				rospy.sleep(4)
+			##	speak = 0
+			elif msg.data.find('months-are') > -1 or  msg.data.find('year') > -1:
+				self.soundhandle.say('twelve months', self.voice)
+				rospy.sleep(4)
+			##	speak = 0
+		elif msg.data.find('how are you') > -1 or msg.data.find('how-are-you') > -1 :
+			self.soundhandle.say('fine', self.voice)
+			rospy.sleep(4)	
+		##	speak = 0
+		
+
+		else :
+			print msg.data
+			#
+			pass
+
+##	def speakerstart(self, msg) :
+	##	global speak
+	##	msg.data = msg.data.lower()
+	##	print msg.data
+	##	if msg.data.find('speaker_start') > -1:
+	##		speak = 1
+	##	else :
+	##		print msg.data
+
+	def cleanup(self):
+		rospy.loginfo("Shutting down talkback node...")
+
+if __name__=="__main__":
+	rospy.init_node('talkback')
+	try:
+		TalkBack()
+		rospy.spin()
+	except:
+		pass
+
+
+'''
+if msg.data.find('follow me') > -1 or msg.data.find('following me') > -1 :
+			print 555
+   		self.soundhandle.say('I will follow you', self.voice)
+    		rospy.sleep(4)
+		elif msg.data.find('stop') > -1 or msg.data.find('stop following me') > -1 or msg.data.find('stop follow') > -1 or msg.data.find('stop following') > -1: 
+			self.soundhandle.say('I stop', self.voice)
+			rospy.sleep(4)
+		elif msg.data.find('take this bag') > -1 or msg.data.find('take this') > -1 or msg.data.find('take this bag to the kitchen') > -1 or msg.data.find('take this bag to kitchen') > -1:
+			self.soundhandle.say('I will take this to kitchen', self.voice) 
+			rospy.sleep(4)
+'''
+
+	
+

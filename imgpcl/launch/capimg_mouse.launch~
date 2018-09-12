@@ -1,0 +1,5 @@
+    <launch>  
+    <include file="/opt/ros/indigo/share/openni_launch/launch/openni.launch" />   
+    <node name="capimg_mouse" pkg="imgpcl" type="capimg_mouse" output="screen" >  
+     </node>  
+    </launch>  

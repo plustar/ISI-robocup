@@ -1,0 +1,7 @@
+<launch>
+<include file="/opt/ros/indigo/share/openni2_launch/launch/primesense_test.launch" />
+<include file="/opt/ros/indigo/share/turtlebot_bringup/launch/minimal.launch" />
+
+ <node name="obj2017_test" pkg="imgpcl" type="obj2017_test" output="screen" >
+ 
+</launch>

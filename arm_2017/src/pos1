@@ -1,0 +1,21 @@
+	# Initial gesture of robot arm
+	self.pos1 = 1.1#1.57#4.14
+	self.pos2 = 2.0
+	self.pos3 = -0.4
+	self.pos4 = -1.7
+	self.pos5 = -0.5
+	
+	self.joint5.publish(self.pos5)
+	rospy.sleep(1)
+	self.joint4.publish(self.pos4)
+	rospy.sleep(1)
+	self.joint3.publish(self.pos3)
+	rospy.sleep(1)
+	self.joint2.publish(0.55)
+	rospy.sleep(1)
+	self.joint1.publish(self.pos1)
+	rospy.sleep(1)
+	self.joint2.publish(self.pos2)
+	rospy.sleep(1)
+
+	rospy.loginfo("Connecting to turtlebot arm....")

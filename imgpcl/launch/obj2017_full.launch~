@@ -1,0 +1,9 @@
+<launch>
+<include file="/opt/ros/hydro/share/openni2_launch/launch/openni2.launch" />
+<include file="/opt/ros/hydro/share/turtlebot_bringup/launch/minimal.launch" />
+
+<node name="socket2topic" pkg="object" type="socket2topic" output="screen" />
+<node name="objectdetect2" pkg="object" type="objectdetect2" output="screen" />
+<node name="launch3dsensor" pkg="object" type="launch3dsensor" output="screen" />
+ 
+</launch>

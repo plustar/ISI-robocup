@@ -1,0 +1,91 @@
+#include <ros/ros.h>
+#include <std_msgs/String.h>
+#include <kobuki_msgs/MotorPower.h>
+#include<geometry_msgs/Twist.h>
+#include <signal.h>
+#include <geometry_msgs/Twist.h>
+#include <tf/transform_listener.h>
+#include <nav_msgs/Odometry.h>
+#include <string.h>
+#include <move_base_msgs/MoveBaseAction.h>
+#include <actionlib/client/simple_action_client.h>
+#include <kobuki_msgs/DigitalInputEvent.h>
+#include <cmath>
+class TurnLeft
+{
+public:    
+  ros::NodeHandle nh;
+  ros::Subscriber emergency_sub;
+  ros::Publisher turn_pub;
+  ros::Publisher cmd_vel_pub;
+  ros::Publisher power_pub;
+  TurnLeft(ros::NodeHandle &nh):nh(nh){}
+  ~TurnLeft(){}
+
+  void init()
+  {
+    emergency_sub = nh.subscribe("/mobile_base/events/digital_input", 100, &TurnLeft::DigitalInputEventCallback, this);
+    power_pub = nh.advertise<kobuki_msgs::MotorPower>("/mobile_base/commands/motor_power", 1);
+    turn_pub = nh.advertise<std_msgs::String>("/turnleft", 1);
+    cmd_vel_pub = nh.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1);
+  }
+  
+  void DigitalInputEventCallback(const kobuki_msgs::DigitalInputEvent::ConstPtr& msg)
+  {
+    ROS_INFO("------------Receive Digital singal----------");
+    bool estop = msg->values[2];
+    if(estop)
+      {
+        kobuki_msgs::MotorPower cmd;
+        cmd.state = kobuki_msgs::MotorPower::OFF;
+        power_pub.publish(cmd);
+      }
+  }
+  
+  void turn_robot(float theta)
+  {
+    int count = 0;
+    float time = 10;
+    ros::Rate loop_rate(10);
+    int num = time*10;
+    geometry_msgs::Twist vel;
+    vel.angular.z = theta;
+    count = 0;
+    while(count < num)
+      {
+        count++;
+        cmd_vel_pub.publish(vel);
+        loop_rate.sleep();
+      }
+    vel.angular.z = 0.0;
+    cmd_vel_pub.publish(vel);
+    sleep(1);
+  }
+
+  void turn_left()
+  {
+    TurnLeft::turn_robot(0.37);
+    std_msgs::String str;
+    turn_pub.publish(str);
+  }
+
+  void detectaround()
+  {
+    for(int i = 0; i < 4; ++i)
+      {
+        TurnLeft::turn_left();
+      }
+  }
+};
+
+int main (int argc, char** argv)
+{
+  ros::init (argc, argv, "DetectAround");
+  ros::NodeHandle nh("~");
+  TurnLeft tl(nh);
+  tl.init();
+  tl.detectaround();
+  ros::spin ();
+  exit(0);
+  return 0;
+}

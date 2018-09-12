@@ -1,0 +1,5 @@
+<launch>  
+<include file="/opt/ros/indigo/share/openni2_launch/launch/openni2.launch" />  
+ <node name=" calibratePrimeArm" pkg="imgpcl" type="calibratePrimeArm" output="screen" >  
+ </node>  
+</launch> 

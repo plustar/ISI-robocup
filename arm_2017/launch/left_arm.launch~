@@ -1,0 +1,29 @@
+<launch>
+
+  <node name="dynamixel_manager_left_arm" pkg="dynamixel_controllers" type="controller_manager_left_arm.py" required="true" output="screen">
+      <rosparam>
+            namespace: dxl_left_manager
+            serial_ports:
+                left_arm_port:
+                    port_name: "/dev/right_arm" 
+                    baud_rate: 1000000
+                    min_motor_id: 1
+                    max_motor_id: 25
+                    update_rate: 20
+      </rosparam>
+  </node>
+
+  <rosparam file="$(find rfa_crane_arm)/config/joints_left_arm.yaml" command="load"/>
+  <node name="tilt_controller_spawner_left_arm" pkg="dynamixel_controllers" type="controller_spawner_left_arm.py"
+        args="--manager=dxl_left_manager
+                --port left_arm_port
+                left_arm_shoulder_pan_joint
+		left_arm_shoulder_lift_joint
+		left_arm_elbow_flex_joint
+		left_arm_wrist_flex_joint
+		left_gripper_joint
+		left_tool_joint"
+        output="screen"/>
+
+  <node name="left_arm" pkg="rfa_crane_arm" type="left_arm.py" output="screen"/>
+</launch>

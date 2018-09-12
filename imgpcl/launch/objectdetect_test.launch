@@ -1,0 +1,7 @@
+<launch>
+<include file="/opt/ros/indigo/share/openni2_launch/launch/primesense_test.launch" />
+
+<node name="socket2topic" pkg="imgpcl" type="socket2topic" output="screen" />
+<node name="objectdetect_test" pkg="imgpcl" type="objectdetect_test" output="screen" />
+<node name="launch3dsensor" pkg="imgpcl" type="launch3dsensor" output="screen" />
+</launch>

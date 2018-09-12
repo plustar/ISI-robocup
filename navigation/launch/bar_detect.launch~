@@ -1,0 +1,15 @@
+<launch>
+  <!-- Turtlebot -->
+  <!--<include file="$(find turtlebot_bringup)/launch/minimal.launch" /> -->
+
+  <!-- openni -->
+  <include file="$(find openni_launch)/launch/openni.launch" />
+  
+  <!-- turn robot -->
+  <node name="turnleft" pkg="navigation" type="turnleft" />
+
+  <!-- detectbar -->
+  <node name="bar_detect" pkg="pclapp" type="bar_detect" />
+
+</launch>
+

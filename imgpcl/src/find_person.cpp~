@@ -1,0 +1,923 @@
+//Includes all the headers necessary to use the most common public pieces of the ROS system.    
+#include <ros/ros.h>    
+//Use image_transport for publishing and subscribing to images in ROS    
+#include <image_transport/image_transport.h>    
+//Use cv_bridge to convert between ROS and OpenCV Image formats    
+#include <cv_bridge/cv_bridge.h>    
+
+#include <sensor_msgs/image_encodings.h>    
+//Include headers for OpenCV Image processing    
+#include <opencv2/imgproc/imgproc.hpp>    
+//Include headers for OpenCV GUI handling    
+#include <opencv2/highgui/highgui.hpp>    
+#include <string>        
+#include <sstream>    
+#include <stdio.h>
+#include "imgpcl/auto_tchar.h"
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <fstream>
+#include <math.h>
+#include <std_msgs/String.h>
+#include <geometry_msgs/Twist.h>
+#include <vector>
+#include <stdlib.h>
+int system(const char *string); 
+using namespace cv;    
+using namespace std;    
+
+//Store all constants for image encodings in the enc namespace to be used later.      
+namespace enc = sensor_msgs::image_encodings; 
+struct PathPoint
+{
+    int state;
+    float vel;
+    float time;
+};     
+vector<PathPoint> vppt;             //储存反馈调节时的调节参数
+bool ifcapimg = 0;
+bool ifcap_operator = 0;
+Mat capimg;       
+const int Width = 92;
+const int Height = 112;
+//int gender_width;
+//int gender_height;
+//int im_width;
+//int im_height;
+int g_howManyPhotoForTraining = 260;
+//
+int g_photoNumberOfOnePerson = 279;
+//ORL
+void image_process(Mat inImg); 
+void gender_predict( Mat frame ); 
+void spCallback(const std_msgs::String::ConstPtr& msg); 
+/// 全局变量
+
+const char* window_name = "gender recognise";
+String face_cascade_name = "/home/isi/2017_ws/src/imgpcl/haarcascade_frontalface_alt.xml";  
+//String eyes_cascade_name = "/home/isi/2017_ws/src/imgpcl/haarcascade_eye_tree_eyeglasses.xml";  
+CascadeClassifier face_cascade;
+//CascadeClassifier eyes_cascade;
+//string window_name = "Capture - Face detection";
+//RNG rng(12345);
+int operator_image_num = 0;
+ros::Publisher move_pub;            //向navigation发消息，微调机器人
+ros::Publisher female_numPub;   //检测到物体的数量
+ros::Publisher male_numPub;
+ros::Publisher human_numPub;   //检测到物体的数量
+ros::Publisher operator_left_numPub;   //检测到物体的数量
+ros::Publisher memorized_operator_Pub; 
+ros::Publisher image2voice;   
+std_msgs::String operator_left_numP;
+std_msgs::String female_numP;
+std_msgs::String male_numP;
+std_msgs::String human_numP;
+std_msgs::String memorized_operator_P;
+std_msgs::String img2voiceP;
+int female_num = 0;
+int male_num = 0;
+int human_num = 0;
+int operator_img_num = 0;
+int operator_gender;
+int operator_label = -1;
+string op_gender;
+int find_operator_method = 0; //0:方法先找operator，再用找相似度最大的operator。
+                                //1：直接找相似度最大的
+MatND getHistogram(Mat &img)//得到直方图    
+{    
+    int channels[]={0};//考察0通道    
+    int HistSize[]={256};//直方图中元素数    
+    float range[]={0,255};    
+    const float *pRange[]={range};    
+    //计算直方图，直方图结果放在hist.at<float>(i)    
+    MatND hist;    
+    calcHist(&img,1,channels,Mat(),hist,1,HistSize,pRange);    
+    return hist;    
+} 
+static void read_csv(const string& filename, vector<Mat>& images, vector<int>& labels, char separator = ';')
+{
+    std::ifstream file(filename.c_str(), ifstream::in);
+    if (!file)
+    {
+        string error_message = "No valid input file was given, please check the given filename.";
+        CV_Error(CV_StsBadArg, error_message);
+    }
+    string line, path, classlabel;
+    while (getline(file, line))
+    {
+        stringstream liness(line);
+        getline(liness, path, separator);
+        getline(liness, classlabel);
+        if (!path.empty() && !classlabel.empty()) 
+        {
+            //images.push_back(imread(path, 0));
+            Mat m = imread(path, 0);
+            if ( m.empty() )
+            {
+                 cerr << path << " could not be read!" << endl;
+                 return;
+            }
+            images.push_back(m);
+            labels.push_back(atoi(classlabel.c_str()));
+        }
+    }
+}
+
+void operator_train_pca()
+{
+    string fn_csv = string("/home/isi/2017_ws/src/imgpcl/operator_index.txt");//图片索引和标签
+    //string fn_csv = string("feret.txt");
+    vector<Mat> allImages, train_images, test_images;
+    vector<int> allLabels, train_labels, test_labels;
+    try
+    {
+        read_csv(fn_csv, allImages, allLabels);
+    }
+    catch (cv::Exception& e) 
+    {
+        cerr << "Error opening file " << fn_csv << ". Reason: " << e.msg << endl;
+        // ÎÄ¼þÓÐÎÊÌâ£¬ÎÒÃÇÉ¶Ò²×ö²»ÁËÁË£¬ÍË³öÁË
+        exit(1);
+    }
+    if (allImages.size() <= 1) 
+    {
+        string error_message = "This demo needs at least 2 images to work. Please add more images to your data set!";
+        CV_Error(CV_StsError, error_message);
+    }
+
+    for (int i = 0; i<allImages.size(); i++)
+        equalizeHist(allImages[i], allImages[i]);
+    //cout<<"AAAAAAAAAAAAAAAAAAAAAa"<<endl;
+    int photoNumber = allImages.size();
+    /*for (int i = 0; i<photoNumber; i++)
+    {
+        if ((i%g_photoNumberOfOnePerson)<g_howManyPhotoForTraining)
+        {
+            train_images.push_back(allImages[i]);
+            train_labels.push_back(allLabels[i]);
+        }
+        else
+        {
+            test_images.push_back(allImages[i]);
+            test_labels.push_back(allLabels[i]);
+        }
+    }*/
+    //cout<<"AAAAAAAAAAAAAAAAAAAAAa"<<endl;
+    Ptr<FaceRecognizer> model = createEigenFaceRecognizer();//¶¨ÒåpcaÄ£ÐÍ     
+    model->train(allImages, allLabels);//ÑµÁ·pcaÄ£ÐÍ£¬ÕâÀïµÄmodel°üº¬ÁËËùÓÐÌØÕ÷ÖµºÍÌØÕ÷ÏòÁ¿£¬Ã»ÓÐËðÊ§  
+    model->save("/home/isi/2017_ws/src/imgpcl/operator_eigenfacepca.yml");//±£´æÑµÁ·½á¹û£¬¹©¼ì²âÊ±Ê¹ÓÃ 
+}
+/*
+void operator_gender_predict( Mat frame )  
+{    //   cout<<"xxxxxxxxxxxxx"<<endl;
+    std::vector<Rect> faces;  
+    Mat frame_gray;  
+    cvtColor( frame, frame_gray, CV_BGR2GRAY );  
+    equalizeHist( frame_gray, frame_gray );  
+    //-- Detect faces  
+    face_cascade.detectMultiScale( frame_gray, faces, 1.1, 3, 0|CV_HAAR_SCALE_IMAGE, Size(30, 30) );  
+    human_num = faces.size();
+    cout<<"human_num:"<<human_num<<endl;
+    if(human_num > 1)
+    {
+        img2voiceP.data = "There is more than one operator!";
+        image2voice.publish(img2voiceP);//发送此时检测到的物体数量 
+    }
+    if(human_num == 1)
+    {  
+       // Rect face_id = faces[i];e
+        //Mat dectImg;
+        Mat face = frame_gray( faces[0] ); 
+        //cout<<"bbbbbbbbbbbbbbbb"<<endl;
+        Mat face_resized;
+        //Mat gender_resized;
+        //gender_width = Width;
+        //gender_height = Height;
+        //im_width = Width;
+        //im_height = Height;
+        cv::resize(face, face_resized, Size(Width, Height), 1.0, 1.0, INTER_CUBIC);
+        //cv::resize(face, gender_resized, Size(gender_width, gender_height), 1.0, 1.0, INTER_CUBIC);
+        rectangle(frame,faces[0],Scalar(0,255,0),1);
+        //cout<<"zzzzzzzzzzzzzz"<<endl;
+        Ptr<FaceRecognizer> gender_model = createEigenFaceRecognizer();
+        gender_model->load("/home/isi/2017_ws/src/imgpcl/eigenfacepca.yml");
+        string box_text;
+        box_text = format( "Operator:" );
+        if(gender_model->predict(face_resized) == 0)
+        {
+            cout<<"operator:woman"<<endl;
+            operator_gender = 0;
+            op_gender = "Female";
+            box_text.append( "Female" );
+        }
+        else
+        {
+            cout<<"operator:man"<<endl;
+            operator_gender = 1;
+            op_gender = "Male";
+            box_text.append( "Male" );
+        }
+        //        cout<<"ccccccccccccccc"<<endl;
+        int pos_x = faces[0].x + faces[0].width * 0.1;
+        int pos_y = faces[0].y + faces[0].height + 10;
+        // And now put it into the image:
+         putText(frame, box_text, Point(pos_x, pos_y), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(0,255,0), 1.0);
+    }
+    //cout<<"female_num"<<female_num<<endl;
+    imshow( window_name, frame );
+    waitKey(10); 
+    imwrite("/home/isi/2017_ws/src/imgpcl/operator_gender_detect.jpg",frame);//保存图片    
+}*/
+void gender_predict( Mat frame,  int find_operator_method)  
+{  
+    //   cout<<"xxxxxxxxxxxxx"<<endl;
+    std::vector<Rect> faces;  
+    Mat frame_gray;  
+    cvtColor( frame, frame_gray, CV_BGR2GRAY );  
+    equalizeHist( frame_gray, frame_gray );  
+    //-- Detect faces  
+    face_cascade.detectMultiScale( frame_gray, faces, 1.1, 3, 0|CV_HAAR_SCALE_IMAGE, Size(30, 30) );  
+    human_num = faces.size();
+    cout<<"human_num:"<<human_num<<endl;
+    Rect tempface;
+    female_num = 0;
+    male_num = 0;
+    img2voiceP.data = "I am processing the image";
+    image2voice.publish(img2voiceP);//发送此时检测到的物体数量 
+    if(human_num == 0)
+    {
+        img2voiceP.data = "There is no people!";
+        image2voice.publish(img2voiceP);//发送此时检测到的物体数量 
+    }
+    else
+    {    ///排序
+        /*for( size_t i = 0; i < faces.size(); i++ )  
+        {
+		    for(int j = faces.size()-1; j > i; j --)
+		    {
+                if(faces[j].x < faces[j - 1].x)
+                {
+                    tempface = faces[j];
+                    faces[j] = faces[j - 1];
+                    faces[j - 1] = tempface;
+                }
+            }
+        }*/
+        int operator_num = 0;
+        stringstream sss;        
+        string strs; 
+        int label[10];
+        operator_label = -1;
+        if(find_operator_method == 0)//操作者匹配+性别+直方图
+        {
+            //统计操作者人数     
+            for( size_t i = 0; i < faces.size(); i++ )  
+            {
+                Mat face = frame_gray( faces[i] ); 
+                //cout<<"bbbbbbbbbbbbbbbb"<<endl;
+                Mat face_resized;
+                //im_width = Width;
+                //im_height = Height;
+                cv::resize(face, face_resized, Size(Width, Height), 1.0, 1.0, INTER_CUBIC);
+                rectangle(frame,faces[i],Scalar(0,255,0),1);
+                //cout<<"zzzzzzzzzzzzzz"<<endl;
+                Ptr<FaceRecognizer> operator_model = createEigenFaceRecognizer();
+                operator_model->load("/home/isi/2017_ws/src/imgpcl/operator_eigenfacepca.yml");
+	            Ptr<FaceRecognizer> gender_model = createEigenFaceRecognizer();
+	            gender_model->load("/home/isi/2017_ws/src/imgpcl/eigenfacepca.yml");
+                strs="/home/isi/2017_ws/src/imgpcl/operator_num";    
+                sss.clear();
+                sss<<strs;
+                //cout<<"0000000000"<<endl;
+                //cout<<"operator_model->predict(face_resized)"<<operator_model->predict(face_resized)<<endl;
+                //cout<<"gender_model->predict(face_resized)"<<gender_model->predict(face_resized)<<endl;
+                if(operator_model->predict(face_resized) == 0 && gender_model->predict(face_resized) == operator_gender)
+                {
+                    //cout<<"11111111111111111"<<endl;
+                    label[operator_num] = i;
+                    sss<<operator_num;                 
+                    sss<<".jpg";     
+                    sss>>strs;            
+                    imwrite(strs,face_resized);
+                    operator_num ++; 
+                }
+            }
+            if(operator_num == 0)
+            {//降低标准：只用operator_model
+                cout<<"降低标准：只用operator_model"<<endl;        
+                for( size_t i = 0; i < faces.size(); i++ )  
+                {
+                    Mat face = frame_gray( faces[i] ); 
+                    //cout<<"bbbbbbbbbbbbbbbb"<<endl;
+                    Mat face_resized;
+                    cv::resize(face, face_resized, Size(Width, Height), 1.0, 1.0, INTER_CUBIC);
+                    rectangle(frame,faces[i],Scalar(0,255,0),1);
+                    //cout<<"zzzzzzzzzzzzzz"<<endl;
+                    Ptr<FaceRecognizer> operator_model = createEigenFaceRecognizer();
+                    operator_model->load("/home/isi/2017_ws/src/imgpcl/operator_eigenfacepca.yml");
+	                Ptr<FaceRecognizer> gender_model = createEigenFaceRecognizer();
+	                //gender_model->load("/home/isi/2017_ws/src/imgpcl/eigenfacepca.yml");
+                    strs="/home/isi/2017_ws/src/imgpcl/operator_num";    
+                    sss.clear();        
+                    sss<<strs;
+                    //cout<<"bbbbbbbbbbbbbbb"<<endl;
+                    //cout<<"operator_model->predict(face_resized)"<<operator_model->predict(face_resized)<<endl;
+                    //cout<<"gender_model->predict(face_resized)"<<gender_model->predict(face_resized)<<endl;
+                    if(operator_model->predict(face_resized) == 0)
+                    {
+                        //cout<<"11nnnnnnnnnnnn111111111"<<endl;
+                        label[operator_num] = i;
+                        sss<<operator_num;                 
+                        sss<<".jpg";     
+                        sss>>strs;            
+                        imwrite(strs,face_resized);
+                        operator_num ++; 
+                    }
+                }
+                if(operator_num == 0)
+                {//只性别一致
+                        cout<<"只性别一致"<<endl;            //统计操作者人数     
+                    for( size_t i = 0; i < faces.size(); i++ )  
+                    {
+                        Mat face = frame_gray( faces[i] ); 
+                        //cout<<"bbbbbbbbbbbbbbbb"<<endl;
+                        Mat face_resized;
+                        //im_width = Width;
+                        //im_height = Height;
+                        cv::resize(face, face_resized, Size(Width, Height), 1.0, 1.0, INTER_CUBIC);
+                        rectangle(frame,faces[i],Scalar(0,255,0),1);
+                        //cout<<"zzzzzzzzzzzzzz"<<endl;
+                        Ptr<FaceRecognizer> operator_model = createEigenFaceRecognizer();
+                        operator_model->load("/home/isi/2017_ws/src/imgpcl/operator_eigenfacepca.yml");
+	                    Ptr<FaceRecognizer> gender_model = createEigenFaceRecognizer();
+	                    gender_model->load("/home/isi/2017_ws/src/imgpcl/eigenfacepca.yml");
+                        strs="/home/isi/2017_ws/src/imgpcl/operator_num";    
+                        sss.clear();        
+                        sss<<strs;
+                        //cout<<"0000000000"<<endl;
+                        //cout<<"operator_model->predict(face_resized)"<<operator_model->predict(face_resized)<<endl;
+                        //cout<<"gender_model->predict(face_resized)"<<gender_model->predict(face_resized)<<endl;
+                        if(operator_model->predict(face_resized) == 0 && gender_model->predict(face_resized) == operator_gender)
+                        {
+                            cout<<"11111111111111111"<<endl;
+                            label[operator_num] = i;
+                            sss<<operator_num;                 
+                            sss<<".jpg";     
+                            sss>>strs;            
+                            imwrite(strs,face_resized);
+                            operator_num ++; 
+                        }
+                    }
+                    if(operator_num == 0)
+                    {//再降低标准//只用直方图匹配
+                    cout<<"再降低标准//只用直方图匹配"<<endl;
+                        for( size_t i = 0; i < faces.size(); i++ )  
+                        {
+                            Mat face = frame_gray( faces[i] ); 
+                            //cout<<"bbbbbbbbbbbbbbbb"<<endl;
+                            Mat face_resized;
+                            //im_width = Width;
+                            //im_height = Height;
+                            cv::resize(face, face_resized, Size(Width, Height), 1.0, 1.0, INTER_CUBIC);
+                            rectangle(frame,faces[i],Scalar(0,255,0),1);
+                            strs="/home/isi/2017_ws/src/imgpcl/detect_face";        
+                            sss.clear();
+                            sss<<strs;
+                            sss<<i;                 
+                            sss<<".jpg";
+                            sss>>strs;         
+                            imwrite(strs,face_resized);
+                        }
+                        Mat imageSource = imread("/home/isi/2017_ws/src/imgpcl/operator_capimg/operator9.jpg",1);//读入原图 
+                        MatND sourceHist=getHistogram(imageSource);    
+                        double maxDistance=0;
+                        
+                        for( size_t i = 0; i < faces.size(); i++ )  
+                        {           
+                            //cout<<"Cccccccccccccc"<<endl;
+                            strs="/home/isi/2017_ws/src/imgpcl/detect_face";    
+                            sss.clear();    
+                            sss<<strs; 
+                            sss<<i;
+                            sss<<".jpg";    
+                            sss>>strs;    
+                            Mat imageDst=imread(strs,1);    
+                            MatND dstHist=getHistogram(imageDst);//计算各个直方图    
+                            double distance=compareHist(sourceHist,dstHist,CV_COMP_INTERSECT);//比较直方图  
+                            cout<<"face_num:"<<operator_num<<", distance:"<<distance<<endl;
+                            // cout<<distance<<endl;    
+                            if(distance > maxDistance)    
+                            {
+                                operator_label = i;
+                                maxDistance=distance;    
+                            }        
+                        }
+                    }
+                    
+                }
+            }
+            if(operator_num == 1)
+                operator_label = label[0];
+            cout<<"0operator_num"<<operator_num<<endl;
+            //确保只有一个operator
+            if(operator_num > 1)
+            {
+                Mat imageSource = imread("/home/isi/2017_ws/src/imgpcl/operator_capimg/operator9.jpg",1);//读入原图    
+                MatND sourceHist = getHistogram(imageSource);     
+                double maxDistance = 0;   
+                for(int i = 0;i < operator_num;i ++)    
+                {    
+                    strs = "/home/isi/2017_ws/src/imgpcl/operator_num";     
+                    sss.clear();    
+                    sss<<strs;    
+                    sss<<i;    
+                    sss<<".jpg";
+                    sss>>strs;    
+                    Mat imageDst = imread(strs,1);    
+                    MatND dstHist = getHistogram(imageDst);//计算各个直方图    
+                    double distance = compareHist(sourceHist,dstHist,CV_COMP_INTERSECT);//比较直方图  
+                    cout<<"operator_num:"<<operator_num<<", distance:"<<distance<<endl;
+                   // cout<<distance<<endl;    
+                    if(distance > maxDistance)    
+                    {
+                        operator_label = label[i];
+                        //strBest=str;
+                        maxDistance = distance;    
+                    }    
+                }
+            }
+        }
+        if(find_operator_method == 1)//性别加直方图
+        {
+            //统计操作者人数  
+            for( size_t i = 0; i < faces.size(); i++ )  
+            {
+                Mat face = frame_gray( faces[i] ); 
+                //cout<<"bbbbbbbbbbbbbbbb"<<endl;
+                Mat face_resized;
+                //im_width = Width;
+                //im_height = Height;
+                cv::resize(face, face_resized, Size(Width, Height), 1.0, 1.0, INTER_CUBIC);
+                rectangle(frame,faces[i],Scalar(0,255,0),1);
+	            Ptr<FaceRecognizer> gender_model = createEigenFaceRecognizer();
+	            gender_model->load("/home/isi/2017_ws/src/imgpcl/eigenfacepca.yml");
+                strs="/home/isi/2017_ws/src/imgpcl/operator_gender_num";    
+                sss.clear();      
+                sss<<strs;
+                if(gender_model->predict(face_resized) == operator_gender)
+                {
+                    cout<<"gender_model->predict(face_resized) == operator_gender"<<endl;
+                    label[operator_num] = i;
+                    sss<<operator_num;             
+                    sss<<".jpg";
+                    sss>>strs;         
+                    imwrite(strs,face_resized);
+                    operator_num ++; 
+                }
+                
+            }
+            if(operator_num == 1)
+                operator_label = label[0];
+            //确保只有一个operator
+            if(operator_num > 1)
+            {
+                Mat imageSource = imread("/home/isi/2017_ws/src/imgpcl/operator_capimg/operator9.jpg",1);//读入原图    
+                MatND sourceHist = getHistogram(imageSource);     
+                double maxDistance = 0;   
+                for(int i = 0;i < operator_num;i ++)    
+                {
+                    strs = "/home/isi/2017_ws/src/imgpcl/operator_gender_num";    
+                    sss.clear();    
+                    sss<<strs;    
+                    sss<<i;    
+                    sss<<".jpg";    
+                    sss>>strs;    
+                    Mat imageDst = imread(strs,1);    
+                    MatND dstHist = getHistogram(imageDst);//计算各个直方图    
+                    double distance = compareHist(sourceHist,dstHist,CV_COMP_INTERSECT);//比较直方图值越大相似度越大 
+                    cout<<"operator_num:"<<operator_num<<", distance:"<<distance<<endl;
+                   // cout<<distance<<endl;
+                    if(distance > maxDistance)    
+                    {
+                        operator_label = label[i];
+                        //strBest=str;
+                        maxDistance = distance;    
+                    }    
+                }
+            }
+        }
+        cout<<"sssssssssssss"<<endl;
+        if(find_operator_method == 2)//只用直方图
+        {
+            //保存人脸
+              cout<<"2222222222222222"<<endl;
+          
+            for( size_t i = 0; i < faces.size(); i++ )  
+            {
+                Mat face = frame_gray( faces[i] ); 
+                //cout<<"bbbbbbbbbbbbbbbb"<<endl;
+                Mat face_resized;
+                //im_width = Width;
+                //im_height = Height;
+                cv::resize(face, face_resized, Size(Width, Height), 1.0, 1.0, INTER_CUBIC);
+                rectangle(frame,faces[i],Scalar(0,255,0),1);
+                strs="/home/isi/2017_ws/src/imgpcl/detect_face";        
+                sss.clear();
+                sss<<strs;
+                sss<<i;                 
+                sss<<".jpg";
+                sss>>strs;         
+                imwrite(strs,face_resized);
+            }
+            Mat imageSource = imread("/home/isi/2017_ws/src/imgpcl/operator_capimg/operator9.jpg",1);//读入原图 
+            MatND sourceHist=getHistogram(imageSource);    
+            double maxDistance=0;
+            
+            for( size_t i = 0; i < faces.size(); i++ )  
+            {           
+                cout<<"Cccccccccccccc"<<endl;
+                strs="/home/isi/2017_ws/src/imgpcl/detect_face";    
+                sss.clear();    
+                sss<<strs; 
+                sss<<i;
+                sss<<".jpg";    
+                sss>>strs;    
+                Mat imageDst=imread(strs,1);    
+                MatND dstHist=getHistogram(imageDst);//计算各个直方图    
+                double distance=compareHist(sourceHist,dstHist,CV_COMP_INTERSECT);//比较直方图  
+                cout<<"face_num:"<<operator_num<<", distance:"<<distance<<endl;
+                // cout<<distance<<endl;    
+                if(distance > maxDistance)    
+                {
+                    operator_label = i;
+                    maxDistance=distance;    
+                }        
+            }
+        }
+        cout<<"operator_label"<<operator_label<<endl;
+        for( size_t i = 0; i < faces.size(); i++ )  
+        {   
+            cout<<faces[i].x<<endl;
+            cout<<faces[i].y<<endl;
+           // Rect face_id = faces[i];
+            //Mat dectImg;
+            Mat face = frame_gray( faces[i] ); 
+            //cout<<"bbbbbbbbbbbbbbbb"<<endl;
+            Mat face_resized;
+            //Mat gender_resized;
+            //gender_width = Width;
+            //gender_height = Height;
+            //im_width = Width;
+            //im_height = Height;
+            cv::resize(face, face_resized, Size(Width, Height), 1.0, 1.0, INTER_CUBIC);
+            //cv::resize(face, gender_resized, Size(gender_width, gender_height), 1.0, 1.0, INTER_CUBIC);
+            rectangle(frame,faces[i],Scalar(0,255,0),1);
+            //cout<<"zzzzzzzzzzzzzz"<<endl;
+            Ptr<FaceRecognizer> operator_model = createEigenFaceRecognizer();
+            operator_model->load("/home/isi/2017_ws/src/imgpcl/operator_eigenfacepca.yml");
+	        Ptr<FaceRecognizer> gender_model = createEigenFaceRecognizer();
+	        gender_model->load("/home/isi/2017_ws/src/imgpcl/eigenfacepca.yml");
+            string box_text;
+            box_text = format( "" );
+            if(operator_label == i)
+            {
+                //operator_num ++;
+                cout<<"operator"<<endl;
+                box_text.append( "Operator:" + op_gender);
+                cout<<"operator_left_num"<<i + 1<<endl;
+                if(i == 0)
+                    operator_left_numP.data = "first";
+                if(i == 1)
+                    operator_left_numP.data = "second";
+                if(i == 2)
+                    operator_left_numP.data = "third";
+                if(i == 3)
+                    operator_left_numP.data = "fourth";
+                if(i == 4)
+                    operator_left_numP.data = "fifth";
+                if(i == 5)
+                    operator_left_numP.data = "sixth";
+                if(i == 6)
+                    operator_left_numP.data = "seventh";
+                if(i == 7)
+                    operator_left_numP.data = "eighth";
+                if(i == 8)
+                    operator_left_numP.data = "ninth";
+                if(i == 9)
+                    operator_left_numP.data = "tenth";
+                if(operator_gender == 0)
+                {
+                    female_num ++;
+                    img2voiceP.data = "The operator is a female!";
+                    image2voice.publish(img2voiceP);//发送此时检测到的物体数量 
+                }
+                if(operator_gender == 1)
+                {
+                    male_num ++;
+                    img2voiceP.data = "The operator is a male!";
+                    image2voice.publish(img2voiceP);//发送此时检测到的物体数量 
+                } 
+            }
+	        else
+	        {
+		        if(gender_model->predict(face_resized) == 0)
+		        {
+		            cout<<"woman"<<endl;
+		            box_text.append( "female" );
+		            female_num ++;
+		        }
+		        else
+		        {
+		            cout<<"man"<<endl;
+		            box_text.append( "male" );
+		            male_num ++;
+		        }
+	        }
+            //        cout<<"ccccccccccccccc"<<endl;
+            int pos_x = faces[i].x;// + faces[i].width * 0.1;
+            int pos_y = faces[i].y + faces[i].height + 10;
+            // And now put it into the image:
+            putText(frame, box_text, Point(pos_x, pos_y), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(0,255,0), 1.0);
+        }
+        cout<<"female_num"<<female_num<<endl;
+        cout<<"male_num"<<male_num<<endl;
+        imshow( window_name, frame );
+        waitKey(10); 
+        imwrite("/home/isi/2017_ws/src/imgpcl/gender_detect.jpg",frame);//保存图片
+        system("/home/isi/2017_ws/src/imgpcl/picToPdf.sh");
+        if(female_num == 0)
+            female_numP.data = "zero";
+        if(female_num == 1)
+            female_numP.data = "one";
+        if(female_num == 2)
+            female_numP.data = "two";
+        if(female_num == 3)
+            female_numP.data = "three";
+        if(female_num == 4)
+            female_numP.data = "four";
+        if(female_num == 5)
+            female_numP.data = "five";
+        if(female_num == 6)
+            female_numP.data = "six";
+        if(female_num == 7)
+            female_numP.data = "seven";
+        if(female_num == 8)
+            female_numP.data = "eight";
+        if(female_num == 9)
+            female_numP.data = "nine";
+        if(female_num == 10)
+            female_numP.data = "ten";
+
+        if(male_num == 0)
+            male_numP.data = "zero";
+        if(male_num == 1)
+            male_numP.data = "one";
+        if(male_num == 2)
+            male_numP.data = "two";
+        if(male_num == 3)
+            male_numP.data = "three";
+        if(male_num == 4)
+            male_numP.data = "four";
+        if(male_num == 5)
+           male_numP.data = "five";
+        if(male_num == 6)
+            male_numP.data = "six";
+        if(male_num == 7)
+            male_numP.data = "seven";
+        if(male_num == 8)
+            male_numP.data = "eight";
+        if(male_num == 9)
+            male_numP.data = "nine";
+        if(male_num == 10)
+            male_numP.data = "ten";
+
+        if(human_num == 0)
+             human_numP.data = "zero";
+        if(human_num == 1)
+             human_numP.data = "one";
+        if(human_num == 2)
+             human_numP.data = "two";
+        if(human_num == 3)
+             human_numP.data = "three";
+        if(human_num == 4)
+             human_numP.data = "four";
+        if(human_num == 5)
+             human_numP.data = "five";
+        if(human_num == 6)
+             human_numP.data = "six";
+        if(human_num == 7)
+             human_numP.data = "seven";
+        if(human_num == 8)
+             human_numP.data = "eight";
+        if(human_num == 9)
+             human_numP.data = "nine";
+        if(human_num == 10)
+             human_numP.data = "ten";
+        human_numPub.publish(human_numP);//发送此时检测到的物体数量
+        sleep(3);
+        female_numPub.publish(female_numP);//发送此时检测到的物体数量
+        sleep(3);
+        male_numPub.publish(male_numP);//发送此时检测到的物体数量
+        sleep(3);
+        operator_left_numPub.publish(operator_left_numP);//发送此时检测到的物体数量 
+    }
+}  
+//This function is called everytime a new image is published    
+void imageCallback(const sensor_msgs::ImageConstPtr& original_image)    
+{    
+    //Convert from the ROS image message to a CvImage suitable for working with OpenCV for processing    
+    cv_bridge::CvImagePtr cv_ptr;      
+    try      
+    {      
+        //Always copy, returning a mutable CvImage      
+        //OpenCV expects color images to use BGR channel order.      
+        cv_ptr = cv_bridge::toCvCopy(original_image, enc::BGR8);      
+    }      
+    catch (cv_bridge::Exception& e) 
+    {      
+        //if there is an error during conversion, display it      
+        ROS_ERROR("tutorialROSOpenCV::main.cpp::cv_bridge exception: %s", e.what());      
+        return;
+    }      
+    image_process(cv_ptr->image);    
+}
+void image_process(Mat inImg)    
+{    
+    if( inImg.empty() )    
+    {    
+        ROS_INFO("Camera image empty");    
+        return;//break;    
+    }     
+    imshow("image_process", inImg);//显示图片 
+    waitKey(10);   
+    stringstream sss;        
+    string strs;   
+    if( !face_cascade.load( face_cascade_name ) ){ printf("--(!)Error loading\n"); };  
+    //if( !eyes_cascade.load( eyes_cascade_name ) ){ printf("--(!)Error loading\n"); };
+    /*if(ifcap_operator)
+    {
+////////采集operator脸
+        std::vector<Rect> faces;  
+        Mat frame_gray;  
+        cvtColor( inImg, frame_gray, CV_BGR2GRAY );  
+        equalizeHist( frame_gray, frame_gray );  
+        //-- Detect faces  
+        face_cascade.detectMultiScale( frame_gray, faces, 1.1, 3, 0|CV_HAAR_SCALE_IMAGE, Size(30, 30) );  
+        human_num = faces.size();
+        cout<<"human_num:"<<human_num<<endl;
+        //cout<<"AAAAAAAAAAAAAAAAA"<<endl;
+        if(human_num == 0)
+        {
+            img2voiceP.data = "There is no operator!";
+            image2voice.publish(img2voiceP);//发送此时检测到的物体数
+            sleep(3); 
+        }
+         if(human_num > 1)
+        {
+            img2voiceP.data = "There is more than one operator!";
+            image2voice.publish(img2voiceP);//发送此时检测到的物体数量
+            sleep(3);  
+        }
+        if(human_num == 1)
+        {  
+            if(operator_img_num < 40)
+            {
+               // Rect face_id = faces[i];e
+                //Mat dectImg;
+                //cout<<"aaaaaaaaaaaaa"<<endl;
+                Mat face = frame_gray( faces[0] ); 
+                //cout<<"bbbbbbbbbbbbbbbb"<<endl;
+                Mat face_resized;
+                //Mat gender_resized;
+                //gender_width = Width;
+                //gender_height = Height;
+                //im_width = Width;
+                //im_height = Height;
+                cv::resize(face, face_resized, Size(Width, Height), 1.0, 1.0, INTER_CUBIC);
+                //cv::resize(face, gender_resized, Size(gender_width, gender_height), 1.0, 1.0, INTER_CUBIC);
+                rectangle(inImg,faces[0],Scalar(0,255,0),1);
+                strs="/home/isi/2017_ws/src/imgpcl/operator_capimg/operator";    
+                sss.clear();        
+                sss<<strs;
+                sss<<operator_img_num;        
+                sss<<".jpg";        
+                sss>>strs;                   
+                imwrite(strs,face_resized);
+                operator_img_num ++;
+            }
+            else
+            {
+                capimg=inImg(Rect(0,0,inImg.cols,inImg.rows));         
+                imwrite("/home/isi/2017_ws/src/imgpcl/cap_operator_img.jpg",capimg);//保存图片  
+                cout<<operator_img_num<<"images have saved!"<<endl;    
+      
+                Mat src;
+                src = imread( "/home/isi/2017_ws/src/imgpcl/cap_operator_img.jpg" );
+                if( !src.data )
+                { 
+                    printf(" No data! -- Exiting the program \n");
+                }
+                //cout<<"qqqqqqqqqqqqqqq"<<endl;
+                operator_gender_predict( src );//识别操作者性别
+                operator_train_pca();
+                memorized_operator_P.data = "memorized_operator";
+                memorized_operator_Pub.publish(memorized_operator_P);
+                //imshow( "cap_op", inImg );
+                //cout<<"AAAAAAAAAAAAAAAAaaa"<<endl;   
+                ifcap_operator = 0;
+            }
+        }
+    }*/
+    if( ifcapimg )    
+    {   
+	    capimg=inImg(Rect(0,0,inImg.cols,inImg.rows));    
+	    imwrite("/home/isi/2017_ws/src/imgpcl/capimg.jpg",capimg);//保存图片  
+	    cout<<"image have saved!"<<endl;  
+ 
+	    /// 指示说明
+	    printf( "\n Zoom In-Out demo  \n " );
+	    printf( "------------------ \n" );
+	    printf( " * [u] -> Zoom in  \n" );
+	    printf( " * [d] -> Zoom out \n" );
+	    printf( " * [ESC] -> Close program \n \n" );
+	    Mat src;
+	    src = imread( "/home/isi/2017_ws/src/imgpcl/capimg.jpg" );
+	    if( !src.data )
+	    { 
+	        printf(" No data! -- Exiting the program \n");
+	    }
+	    //cout<<"qqqqqqqqqqqqqqq"<<endl;
+	   /* cout<<"method2:"<<endl;
+	    gender_predict( src, 2 );
+	    cout<<"method1:"<<endl;
+	    gender_predict( src, 1 );*/
+	    cout<<"method0:"<<endl;
+	    gender_predict( src, 0 );
+	    //cout<<"AAAAAAAAAAAAAAAAaaa"<<endl;   
+	    ifcapimg = 0;
+    }
+} 
+void spCallback(const std_msgs::String::ConstPtr& msg)
+{
+	//cout<<"spCallback()\n";
+    ROS_INFO("spCallback received: %s\n", msg->data.c_str());
+    /*if(msg->data == "cap_operator")
+    {
+        ifcap_operator = 1;
+    }*/
+    if(msg->data == "turn_robot")//转180度
+    {
+        geometry_msgs::Twist vel;
+        int count = 0;
+        float time = 5;
+        ros::Rate loop_rate(10);
+        int num = time*10;
+        PathPoint pt;
+        //转180度
+        float theta = 5;
+		//cout<<"theta:"<<theta<<endl;
+		float theta2 = theta/time;
+		vel.angular.z = theta2;    
+        count = 0;
+        num = time*10;
+        while(count < num)
+        {
+            count++;
+            move_pub.publish(vel);
+            loop_rate.sleep();
+        }
+        pt.state = 0;
+        pt.time = time;
+        pt.vel = vel.angular.z;
+        vppt.push_back(pt);
+        vel.angular.z = 0.0;
+        move_pub.publish(vel);
+        cout<<"转弯\n";
+        sleep(2);
+        ifcapimg = 1;     
+    }
+}   
+/** 
+* This is ROS node to track the destination image 
+*/    
+int main(int argc, char **argv)    
+{    
+    ros::init(argc, argv, "image_process");    
+    ROS_INFO("-----------------");    
+    ros::NodeHandle nh;
+    move_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/navi",1);  //移动
+    female_numPub = nh.advertise<std_msgs::String>("female_num", 1);//检测到的物体数量
+    male_numPub = nh.advertise<std_msgs::String>("male_num", 1);//检测到的物体数量
+    human_numPub = nh.advertise<std_msgs::String>("human_num", 1);//检测到的物体数量
+    operator_left_numPub = nh.advertise<std_msgs::String>("operator_left_num", 1);//检测到的物体数量
+    memorized_operator_Pub = nh.advertise<std_msgs::String>("memorized_operator", 1);
+    image2voice = nh.advertise<std_msgs::String>("img2voice", 1);//检测到的物体数量
+    image_transport::ImageTransport it(nh);    
+    image_transport::Subscriber sub = it.subscribe("camera1/rgb/image_raw", 1, imageCallback);    
+   // ros::Subscriber camInfo         = nh.subscribe("camera/rgb/camera_info", 1, camInfoCallback);    
+    ros::Subscriber sp_sub = nh.subscribe("/voice2img", 1, spCallback);  //订阅voice的消息
+    ros::spin();    
+    
+    //ROS_INFO is the replacement for printf/cout.    
+    ROS_INFO("main.cpp::No error.");    
+}

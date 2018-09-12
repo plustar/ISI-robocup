@@ -1,0 +1,12 @@
+#include <moveit/move_group_interface/move_group.h>
+#include <ros/ros.h>
+#include <std_msgs/String.h>
+#include "boost/thread/mutex.hpp"
+#include "boost/thread/thread.hpp"
+#include "ros/console.h"
+
+class test{
+private:
+  ros::NodeHandle nh;
+  ros::AsyncSpinner spinner();
+}

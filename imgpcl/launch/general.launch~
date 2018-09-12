@@ -1,0 +1,6 @@
+<launch>
+<include file="/opt/ros/indigo/share/openni2_launch/launch/primesense_test.launch" />
+ <node name="findaperson_pcl2016" pkg="imgpcl" type="findaperson_pcl2016" output="screen" >
+  <node name="general_obj2016" pkg="imgpcl" type="general_obj2016" output="screen" >
+ </node>
+</launch>

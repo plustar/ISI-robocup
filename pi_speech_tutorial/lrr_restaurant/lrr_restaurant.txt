@@ -1,0 +1,12 @@
+begin
+jack
+green-tea
+cafe-au-lait
+iced-tea
+grape-fruit-juice
+strawberry-juice
+potato-chips
+cookie
+potato-sticks
+
+

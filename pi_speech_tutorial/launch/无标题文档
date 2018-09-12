@@ -1,0 +1,8 @@
+  <node name="test_turnaround" pkg="pi_speech_tutorial" type="test_turnaround.py" output="screen"/>
+
+
+  <node name="gpsr" pkg="pi_speech_tutorial" type="talkback_gpsr2.py" output="screen">
+  	<param name="voice" value="voice_cmu_us_clb_arctic_clunits"/>
+  	<param name="wavepath" value="$(find pi_speech_tutorial)/sounds"/>
+
+  </node>

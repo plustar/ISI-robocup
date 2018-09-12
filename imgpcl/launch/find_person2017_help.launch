@@ -1,0 +1,5 @@
+<launch>
+
+ <node name="find_person2017_help" pkg="imgpcl" type="find_person2017_help" output="screen" >
+ </node>
+</launch>

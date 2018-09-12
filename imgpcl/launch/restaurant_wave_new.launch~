@@ -1,0 +1,6 @@
+<launch>
+<include file="/opt/ros/indigo/share/openni2_launch/launch/primesense_test.launch" />
+
+<node name="restaurant_wave" pkg="imgpcl" type="restaurant_wave" output="screen">
+  </node>
+</launch>

@@ -1,0 +1,1 @@
+objectDetect-bisai.cpp是宋陪陪学姐的程序，放在本文件夹内需要改include文件及其他涉及到的路径。还有.cpp,.hpp,.h文件中object::pos改为imgpcl::pos,因为pos消息前面是程序包的名字。

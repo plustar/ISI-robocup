@@ -1,0 +1,57 @@
+Language model created by QuickLM on Sat Jun 24 21:41:36 EDT 2017
+Copyright (c) 1996-2010 Carnegie Mellon University and Alexander I. Rudnicky
+
+The model is in standard ARPA format, designed by Doug Paul while he was at MITRE.
+
+The code that was used to produce this language model is available in Open Source.
+Please visit http://www.speech.cs.cmu.edu/tools/ for more information
+
+The (fixed) discount mass is 0.5. The backoffs are computed using the ratio method.
+This model based on a corpus of 8 sentences and 10 words
+
+\data\
+ngram 1=10
+ngram 2=16
+ngram 3=8
+
+\1-grams:
+-0.7782 </s> -0.3010
+-0.7782 <s> -0.2218
+-1.6812 BEGIN -0.2218
+-1.6812 COOKIE -0.2218
+-1.6812 GRAPE-FRUIT-JUICE -0.2218
+-1.6812 GREEN-TEA -0.2218
+-1.6812 ICED-TEA -0.2218
+-1.6812 JACK -0.2218
+-1.6812 POTATO-CHIPS -0.2218
+-1.6812 STRAWBERRY-JUICE -0.2218
+
+\2-grams:
+-1.2041 <s> BEGIN 0.0000
+-1.2041 <s> COOKIE 0.0000
+-1.2041 <s> GRAPE-FRUIT-JUICE 0.0000
+-1.2041 <s> GREEN-TEA 0.0000
+-1.2041 <s> ICED-TEA 0.0000
+-1.2041 <s> JACK 0.0000
+-1.2041 <s> POTATO-CHIPS 0.0000
+-1.2041 <s> STRAWBERRY-JUICE 0.0000
+-0.3010 BEGIN </s> -0.3010
+-0.3010 COOKIE </s> -0.3010
+-0.3010 GRAPE-FRUIT-JUICE </s> -0.3010
+-0.3010 GREEN-TEA </s> -0.3010
+-0.3010 ICED-TEA </s> -0.3010
+-0.3010 JACK </s> -0.3010
+-0.3010 POTATO-CHIPS </s> -0.3010
+-0.3010 STRAWBERRY-JUICE </s> -0.3010
+
+\3-grams:
+-0.3010 <s> BEGIN </s>
+-0.3010 <s> COOKIE </s>
+-0.3010 <s> GRAPE-FRUIT-JUICE </s>
+-0.3010 <s> GREEN-TEA </s>
+-0.3010 <s> ICED-TEA </s>
+-0.3010 <s> JACK </s>
+-0.3010 <s> POTATO-CHIPS </s>
+-0.3010 <s> STRAWBERRY-JUICE </s>
+
+\end\

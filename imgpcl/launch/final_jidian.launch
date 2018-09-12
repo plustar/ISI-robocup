@@ -1,0 +1,9 @@
+<launch>
+
+<include file="/opt/ros/indigo/share/turtlebot_bringup/launch/minimal.launch" />
+
+<node name="socket2topic_jd" pkg="socket" type="socket2topic_jd" output="screen" />
+
+<node name="final_robot_move" pkg="imgpcl" type="final_robot_move" output="screen" />
+ 
+</launch>

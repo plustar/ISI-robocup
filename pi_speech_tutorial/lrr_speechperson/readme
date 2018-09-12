@@ -1,0 +1,1 @@
+pocketsphinx_continuous -inmic yes -dict /home/isi/2017_ws/src/pi_speech_tutorial/lrr_speechperson/lrr_speechperson.dic -lm /home/isi/2017_ws/src/pi_speech_tutorial/lrr_speechperson/lrr_speechperson.lm

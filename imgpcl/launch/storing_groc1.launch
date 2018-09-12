@@ -1,0 +1,5 @@
+<launch>
+<include file="/opt/ros/indigo/share/openni2_launch/launch/primesense_test.launch" />
+ <node name="storing_groc1" pkg="imgpcl" type="storing_groc1" output="screen" >
+ </node>
+</launch>

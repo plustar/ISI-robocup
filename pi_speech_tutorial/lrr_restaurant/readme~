@@ -1,0 +1,1 @@
+pocketsphinx_continuous -inmic yes -dict /home/kris/2017_ws/src/pi_speech_tutorial/lrr_restaurant/lrr_restaurant.dic -lm/home/kris/2017_ws/src/pi_speech_tutorial/lrr_restaurant/lrr_restaurant.lm

@@ -1,0 +1,1 @@
+pocketsphinx_continuous -inmic yes -dict /home/kris/2017_ws/src/pi_speech_tutorial/nav_help/nav_help.dic -lm /home/kris/2017_ws/src/pi_speech_tutorial/nav_help/nav_help.lm 

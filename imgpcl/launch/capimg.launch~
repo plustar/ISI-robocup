@@ -1,0 +1,5 @@
+<launch>  
+<include file="/opt/ros/hydro/share/openni2_launch/launch/openni2.launch" />  
+ <node name="capimg" pkg="object" type="capimg" output="screen" >  
+ </node>  
+</launch> 

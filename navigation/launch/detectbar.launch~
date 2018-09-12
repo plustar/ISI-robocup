@@ -1,0 +1,17 @@
+<launch>
+  <!-- Turtlebot -->
+  <include file="$(find turtlebot_bringup)/launch/minimal.launch" />
+    
+  <!-- 3D_sensor -->
+  <!--<include file="$(find openni_launch)/launch/openni.launch" />-->
+  <!-- 3D sensor -->
+  <arg name="3d_sensor" default="$(env TURTLEBOT_3D_SENSOR)"/>
+  <include file="$(find turtlebot_bringup)/launch/3dsensor.launch">
+    <arg name="scan_topic" value="/scan" />
+  </include>
+  
+  <!-- Load C++ Node -->
+  <node pkg="pclapp" type="turn" name="turn" respawn="true" launch-prefix="xterm -e"/>
+  
+  <node pkg="navigation" type="turn" name="turn" required="true"/>
+</launch>

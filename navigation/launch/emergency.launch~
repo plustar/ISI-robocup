@@ -1,0 +1,10 @@
+<launch>
+  <!-- Turtlebot -->
+  <include file="$(find turtlebot_bringup)/launch/minimal.launch" />
+  
+  <!-- Load C++ Node -->
+  <node pkg="navigation" type="emergency" name="emergency" launch-prefix="xterm -e"/>
+  
+  <node pkg="navigation" type="turn" name="turn"/>
+  
+</launch>
